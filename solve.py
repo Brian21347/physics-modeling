@@ -13,9 +13,8 @@ def main():
         "-v", "--verbose", action="store_true", help="Increase output verbosity for debugging"
     )
     args = parser.parse_args()
-    sol = Solver(args.seed)
+    sol = Solver(args.seed, args.output)
     sol.solve()
-    sol.save(args.output)
 
 
 if __name__ == "__main__":

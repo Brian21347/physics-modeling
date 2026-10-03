@@ -1,16 +1,15 @@
-import multiprocessing
 from json import dump
 
 from interfaces import *
 from optimal_transport import *
 
 WORLD_TYPES = ["disk", "sphere", "torus", "klein"]
-PER_WORLD_TIME_OUTS = [20, 20, 20, 20]
 
 
 class Solver:
-    def __init__(self, seed) -> None:
+    def __init__(self, seed, output) -> None:
         self.seed = seed
+        self.out = output
         self.paths: dict[str, list[DeliveryPath]] = {}
         self.instances = generate_instances(seed)
 
@@ -46,20 +45,14 @@ class Solver:
 
     def solve(self):
         self.get_base_line()
+        self.save()
         for i, world_type in enumerate(WORLD_TYPES):
-            process = multiprocessing.Process(
-                target=self.solve_world, args=(self.instances[world_type],)
-            )
-            process.start()
-            process.join(timeout=PER_WORLD_TIME_OUTS[i])
+            self.solve_world(self.instances[world_type])
+            self.save()
 
-            if process.is_alive():
-                process.terminate()
-                process.join()
-
-    def save(self, output: str):
+    def save(self):
         """
         Save the array storing the outputs for the different trees using the paths stored in `self.paths`.
         """
-        with open(output, mode="w") as f:
+        with open(self.out, mode="w") as f:
             dump({name: [p.get_dict() for p in paths] for name, paths in self.paths.items()}, f)
