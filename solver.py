@@ -20,7 +20,8 @@ class Solver:
         endpoints = instance.endpoints
         checkpoints = instance.checkpoints
         start = instance.start
-    
+
+        #Precompute important values
         direct_endpoint_distances = [geodesic_distance(instance, start, endpoint) for endpoint in endpoints]
         direct_checkpoint_distances = [geodesic_distance(instance, start, checkpoint) for checkpoint in checkpoints]
         midpoint_midpoint_crosses_ocean = [[leg_crosses_ocean(instance, checkpoints[i], checkpoints[j]) for j in range(i)] for i in range(1, N_CHECKPOINTS)]
@@ -35,7 +36,8 @@ class Solver:
             for i, checkpoint in enumerate(checkpoints):
                 if direct_checkpoint_distances[i] <= vehicle.max_leg_m and not start_midpoint_crosses_ocean[i]:
                     candidate_midpoint_distances[1][i] = direct_checkpoint_distances[i]
-    
+
+            #Find best midpoint pathes
             for n in range(2, N_CHECKPOINTS + 1):
                 for i, destination in enumerate(checkpoints):
                     for j, source in enumerate(checkpoints):
@@ -50,7 +52,8 @@ class Solver:
     
             candidate_path_distances = [[math.inf] * N_CHECKPOINTS for _ in range(N_CHECKPOINTS + 1)]
             candidate_path_traceback = [[-1] * N_CHECKPOINTS for _ in range(N_CHECKPOINTS + 1)]
-    
+
+            #Find best endpoint pathes using midpoint pathes
             for i, endpoint in enumerate(endpoints):
                 if direct_endpoint_distances[i] <= vehicle.max_leg_m and not start_endpoint_crosses_ocean[i]:
                     candidate_path_distances[0][i] = direct_endpoint_distances[i]
