@@ -5,15 +5,14 @@ Coordinates and distances use SI units (meters) (as they should). One model time
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
 import argparse
 import json
 import math
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 import numpy as np
-
 
 # ---------------------------------------------------------------------------
 # Global challenge parameters
@@ -141,6 +140,7 @@ class DeliveryMetrics:
 # Geometry helpers
 # ---------------------------------------------------------------------------
 
+
 def _sample_disk(rng: np.random.Generator, n: int, radius_m: float) -> np.ndarray:
     # sqrt(U) is required for uniform area density.
     r = radius_m * np.sqrt(rng.random(n))
@@ -199,11 +199,11 @@ def _reduce_klein_cover(point: np.ndarray, side_m: float) -> np.ndarray:
 
 def geodesic_distance(instance: MapInstance, a: Sequence[float], b: Sequence[float]) -> float:
     """Shortest geodesic distance for the reference geometry."""
-    a = np.asarray(a, dtype=float)
-    b = np.asarray(b, dtype=float)
+    a = np.asarray(a, dtype=float)  # type: ignore
+    b = np.asarray(b, dtype=float)  # type: ignore
 
     if instance.name == "disk":
-        return float(np.linalg.norm(b - a))
+        return float(np.linalg.norm(b - a))  # type: ignore
 
     if instance.name == "sphere":
         r = instance.scale_m
@@ -212,10 +212,10 @@ def geodesic_distance(instance: MapInstance, a: Sequence[float], b: Sequence[flo
         return r * angle
 
     if instance.name == "torus":
-        return float(np.linalg.norm(_torus_delta(a, b, instance.scale_m)))
+        return float(np.linalg.norm(_torus_delta(a, b, instance.scale_m)))  # type: ignore
 
     if instance.name == "klein":
-        lift = _klein_best_lift(a, b, instance.scale_m)
+        lift = _klein_best_lift(a, b, instance.scale_m)  # type: ignore
         return float(np.linalg.norm(lift - a))
 
     raise ValueError(f"Unsupported manifold: {instance.name}")
@@ -228,28 +228,28 @@ def _geodesic_samples(
     n: int = 96,
 ) -> np.ndarray:
     """Sample a reference shortest geodesic, used for ocean intersection checks."""
-    a = np.asarray(a, dtype=float)
-    b = np.asarray(b, dtype=float)
+    a = np.asarray(a, dtype=float)  # type: ignore
+    b = np.asarray(b, dtype=float)  # type: ignore
     ts = np.linspace(0.0, 1.0, n)
 
     if instance.name == "disk":
-        return a[None, :] + ts[:, None] * (b - a)[None, :]
+        return a[None, :] + ts[:, None] * (b - a)[None, :]  # type: ignore
 
     if instance.name == "torus":
-        d = _torus_delta(a, b, instance.scale_m)
-        return (a[None, :] + ts[:, None] * d[None, :]) % instance.scale_m
+        d = _torus_delta(a, b, instance.scale_m)  # type: ignore
+        return (a[None, :] + ts[:, None] * d[None, :]) % instance.scale_m  # type: ignore
 
     if instance.name == "klein":
-        lift = _klein_best_lift(a, b, instance.scale_m)
-        cover = a[None, :] + ts[:, None] * (lift - a)[None, :]
+        lift = _klein_best_lift(a, b, instance.scale_m)  # type: ignore
+        cover = a[None, :] + ts[:, None] * (lift - a)[None, :]  # type: ignore
         return np.vstack([_reduce_klein_cover(p, instance.scale_m) for p in cover])
 
     if instance.name == "sphere":
         r = instance.scale_m
-        ua, ub = a / r, b / r
+        ua, ub = a / r, b / r  # type: ignore
         omega = math.acos(np.clip(float(np.dot(ua, ub)), -1.0, 1.0))
         if omega < 1e-12:
-            return np.repeat(a[None, :], n, axis=0)
+            return np.repeat(a[None, :], n, axis=0)  # type: ignore
         sin_omega = math.sin(omega)
         if abs(sin_omega) < 1e-10:  # nearly antipodal: normalized interpolation fallback
             raw = (1.0 - ts[:, None]) * ua[None, :] + ts[:, None] * ub[None, :]
@@ -288,7 +288,9 @@ def leg_crosses_ocean(instance: MapInstance, a: Sequence[float], b: Sequence[flo
     return False
 
 
-def route_distance(instance: MapInstance, points: Sequence[Sequence[float]]) -> tuple[float, list[float]]:
+def route_distance(
+    instance: MapInstance, points: Sequence[Sequence[float]]
+) -> tuple[float, list[float]]:
     if len(points) < 2:
         return 0.0, []
     legs = [geodesic_distance(instance, a, b) for a, b in zip(points[:-1], points[1:])]
@@ -298,6 +300,7 @@ def route_distance(instance: MapInstance, points: Sequence[Sequence[float]]) -> 
 # ---------------------------------------------------------------------------
 # Instance generation
 # ---------------------------------------------------------------------------
+
 
 def _sample_points_for_manifold(
     rng: np.random.Generator, name: str, n: int, scale_m: float
@@ -374,6 +377,7 @@ def generate_instances(seed: int = PUBLIC_SEED) -> dict[str, MapInstance]:
 # ---------------------------------------------------------------------------
 # Reference scoring helpers
 # ---------------------------------------------------------------------------
+
 
 def compute_mileage(transportation_method: str) -> float:
     """Distance in meters traveled per fuel unit."""
@@ -454,12 +458,16 @@ def evaluate_delivery(
     points = [instance.start, *cps, instance.endpoints[endpoint]]
     total_distance, legs = route_distance(instance, points)
     if any(d > spec.max_leg_m + 1e-9 for d in legs):
-        return _infeasible(endpoint, vehicle, load, "maximum leg range/stamina exceeded", total_distance)
+        return _infeasible(
+            endpoint, vehicle, load, "maximum leg range/stamina exceeded", total_distance
+        )
 
     if not spec.can_cross_ocean:
         for a, b in zip(points[:-1], points[1:]):
             if leg_crosses_ocean(instance, a, b):
-                return _infeasible(endpoint, vehicle, load, "ground route crosses an ocean region", total_distance)
+                return _infeasible(
+                    endpoint, vehicle, load, "ground route crosses an ocean region", total_distance
+                )
 
     travel_time = total_distance / spec.speed_m_per_day + MIN_CHECKPOINT_TIME_DAYS * len(cps)
     if travel_time > spec.lifetime_days:
@@ -471,7 +479,7 @@ def evaluate_delivery(
     total_tokens = dispatch_tokens + fuel_tokens
 
     direct_distance = max(
-        geodesic_distance(instance, instance.start, instance.endpoints[endpoint]),
+        geodesic_distance(instance, instance.start, instance.endpoints[endpoint]),  # type: ignore
         1.0,
     )
     detour_ratio = max(1.0, total_distance / direct_distance)
@@ -484,11 +492,13 @@ def evaluate_delivery(
     attack_probability = 1.0 - math.exp(-attack_rate * travel_time)
     attack_retention = 1.0 - ATTACK_LOSS_FRACTION * attack_probability
     wear_fraction = math.exp(-DETOUR_WEAR_RATE * (detour_ratio - 1.0))
-    food_fraction = FOOD_RETAINED_PER_DAY ** travel_time
+    food_fraction = FOOD_RETAINED_PER_DAY**travel_time
     nutrition = nutrition_fraction(travel_time)
 
     served_fraction = min(load / demand, 1.0)
-    endpoint_quality = served_fraction * food_fraction * nutrition * attack_retention * wear_fraction
+    endpoint_quality = (
+        served_fraction * food_fraction * nutrition * attack_retention * wear_fraction
+    )
 
     return DeliveryMetrics(
         feasible=True,
@@ -532,7 +542,7 @@ def score_manifold(
     total_fuel_tokens = 0.0
 
     for delivery in deliveries:
-        endpoint = int(delivery["endpoint"])
+        endpoint = int(delivery["endpoint"])  # type: ignore
         vehicle = str(delivery["vehicle"])
         checkpoints = delivery.get("checkpoints", ())
         load_kg = delivery.get("load_kg", None)
@@ -540,8 +550,8 @@ def score_manifold(
             instance,
             endpoint=endpoint,
             vehicle=vehicle,
-            checkpoint_indices=tuple(int(x) for x in checkpoints),
-            load_kg=None if load_kg is None else float(load_kg),
+            checkpoint_indices=tuple(int(x) for x in checkpoints),  # type: ignore
+            load_kg=None if load_kg is None else float(load_kg),  # type: ignore
         )
         metrics.append(m)
         if math.isfinite(m.total_tokens):
@@ -612,7 +622,7 @@ def score_plan(
             raise TypeError(f"Plan entry {name!r} must be a list of deliveries")
         result = score_manifold(instance, deliveries)
         world_results[name] = result
-        world_scores[name] = float(result["score"])
+        world_scores[name] = float(result["score"])  # type: ignore
 
     return {
         "worlds": world_results,
@@ -634,13 +644,14 @@ def seed_has_clear_depots(seed: int) -> tuple[bool, list[str]]:
     generation, so seed 67 and all participant-facing behavior remain unchanged.
     """
     instances = generate_instances(seed)
-    bad = [name for name, inst in instances.items() if point_in_ocean(inst, inst.start)]
+    bad = [name for name, inst in instances.items() if point_in_ocean(inst, inst.start)]  # type: ignore
     return (len(bad) == 0, bad)
 
 
 # ---------------------------------------------------------------------------
 # Export / command-line interface
 # ---------------------------------------------------------------------------
+
 
 def _array(x: np.ndarray) -> list:
     return np.asarray(x).tolist()
@@ -692,7 +703,7 @@ def print_summary(instances: Mapping[str, MapInstance], seed: int) -> None:
         )
     print("Maps:")
     for name, inst in instances.items():
-        direct = np.array([geodesic_distance(inst, inst.start, p) for p in inst.endpoints])
+        direct = np.array([geodesic_distance(inst, inst.start, p) for p in inst.endpoints])  # type: ignore
         print(
             f"  {name:6s}: checkpoints={len(inst.checkpoints):2d}, "
             f"endpoints={len(inst.endpoints):2d}, oceans={len(inst.ocean_centers)}, "
@@ -728,7 +739,7 @@ def main() -> None:
     print_summary(instances, args.seed)
 
     if args.check_depot:
-        bad = [name for name, inst in instances.items() if point_in_ocean(inst, inst.start)]
+        bad = [name for name, inst in instances.items() if point_in_ocean(inst, inst.start)]  # type: ignore
         if bad:
             print("Depot-in-ocean worlds:", ", ".join(bad))
         else:
@@ -742,13 +753,13 @@ def main() -> None:
         result = score_plan(instances, load_plan(args.score_plan))
         print("Scores:")
         for name in FINAL_SCORE_WEIGHTS:
-            r = result["worlds"][name]
+            r = result["worlds"][name]  # type: ignore
             print(
                 f"  {name:6s}: {float(r['score']):8.4f}  "
                 f"tokens={float(r['tokens_used']):8.2f}  "
                 f"budget_valid={bool(r['budget_valid'])}"
             )
-        print(f"Final weighted score C = {float(result['final_score']):.6f}")
+        print(f"Final weighted score C = {float(result['final_score']):.6f}")  # type: ignore
         if args.score_json:
             args.score_json.write_text(json.dumps(result, indent=2), encoding="utf-8")
             print(f"Wrote {args.score_json}")
