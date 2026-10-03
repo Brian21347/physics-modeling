@@ -9,9 +9,5 @@ class DeliveryPath:
     vehicle: str
     checkpoints: list[int]
 
-    #     {
-    #   "disk":  [{"endpoint": 0, "vehicle": "truck", "checkpoints": []}],
-    #   "sphere": [...],
-    #   "torus":  [...],
-    #   "klein":  [...]
-    # }
+    def get_dict(self) -> dict[str, int | str | list]:
+        return {"endpoint": self.endpoint, "vehicle": self.vehicle, "checkpoints": self.checkpoints}
