@@ -1,4 +1,5 @@
 from json import dump
+from multiprocessing import Process
 
 from interfaces import *
 from optimal_transport import *
@@ -276,12 +277,18 @@ class Solver:
                     all_deliveries.append(DeliveryPath(i, vehicle, []))
             self.paths[world_type] = all_deliveries
 
-    def solve(self):
+    def timed_solve(self):
         self.get_base_line()
         self.save()
         for i, world_type in enumerate(WORLD_TYPES):
             self.solve_world(self.instances[world_type])
             self.save()
+
+    def solve(self):
+        p = Process(target=self.timed_solve)
+        p.join(119)
+        if p.is_alive():
+            p.kill()
 
     def save(self):
         """
